@@ -10,7 +10,6 @@ add_executable(clio
     main.cpp
     Clio.h
     Serializer.h
-    Serializer.cpp
 )
 
 install(TARGETS clio

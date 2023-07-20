@@ -7,6 +7,8 @@ template <typename Interface>
 struct Array;
 template <typename Interface>
 struct Object;
+template <typename Interface>
+struct Blob;
 
 template <typename Interface>
 struct Node : Clio::Node<Interface> {
@@ -73,6 +75,13 @@ struct Object : Node<Interface> {
         this->node.pushKey(std::forward<Key>(key));
         return Array(this->node);
     }
+
+    template <typename Key>
+    auto blob(Key&& key) {
+        this->node.pushKey(std::forward<Key>(key));
+        return Blob(this->node);
+    }
+
     template <typename Key, typename ValueType>
     std::enable_if_t<is_primitive_v<ValueType>> value(Key&& key, const ValueType v) {
         this->node.pushKey(std::forward<Key>(key));
@@ -96,11 +105,38 @@ struct Array : Node<Interface> {
         this->node.pushArray();
     }
     ~Array() {
-        this->node.pushArray();
+        this->node.popArray();
     }
 
     auto object() { return Object(this->node); }
     auto array() { return Array(this->node); }
+    auto blob() { return Blob(this->node); }
+
+    template <typename ValueType>
+    std::enable_if_t<is_primitive_v<ValueType>> value(const ValueType v) {
+        this->pushValue(v);
+    }
+
+    template <typename ValueType>
+    std::enable_if_t<!is_primitive_v<ValueType>> value(const ValueType& v) {
+        this->pushValue(v);
+    }
+
+    template <typename ValueType>
+    void value(const std::optional<ValueType>& v) {
+        if (!v) return;
+        value(v.value());
+    }
+};
+
+template <typename Interface>
+struct Blob : Node<Interface> {
+    Blob(Interface& parent) : Node<Interface>(parent) {
+        this->node.pushBlob();
+    }
+    ~Blob() {
+        this->node.popBlob();
+    }
 
     template <typename ValueType>
     std::enable_if_t<is_primitive_v<ValueType>> value(const ValueType v) {
@@ -127,6 +163,7 @@ struct Serializer : Serialization::Node<Interface> {
 
     auto object() { return Serialization::Object(this->node); }
     auto array() { return Serialization::Array(this->node); }
+    auto blob() { return Serialization::Blob(this->node); }
 
     template <typename ValueType>
     std::enable_if_t<Clio::is_primitive_v<ValueType>> value(const ValueType v) {
