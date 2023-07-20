@@ -1,15 +1,9 @@
 #pragma once
 #include "Clio.h"
+#include <utility>
 #include <optional>
 
 namespace Clio::Serialization {
-template <typename Interface>
-struct Array;
-template <typename Interface>
-struct Object;
-template <typename Interface>
-struct Blob;
-
 template <typename Interface>
 struct Node : Clio::Node<Interface> {
     using Base = Clio::Node<Interface>;
@@ -17,11 +11,11 @@ struct Node : Clio::Node<Interface> {
 
 protected:
     template <typename ValueType>
-    void pushValue(ValueType v) {
+    void writeValue(ValueType v) {
         if constexpr (traits::template has_global_write<ValueType>::value) {
             serialize(this->node, std::forward<ValueType>(v));
         }
-        else if constexpr (traits::template has_internal_write<ValueType>::value){
+        else if constexpr (traits::template has_internal_write<ValueType>::value) {
             this->node.write(std::forward<ValueType>(v));
         }
         else {
@@ -46,7 +40,7 @@ private:
         template <typename Type>
         using global_write_trait = std::void_t<
             decltype(serialize(std::declval<Interface&>(), std::declval<const Type&>())),
-            std::enable_if_t<!std::is_same_v<remove_cvref_t<Type>, write_argument_t<Type>>>
+            std::enable_if_t<!is_primitive_v<Type>>
         >;
         template <typename, typename = void>
         struct has_global_write : std::false_type {};
@@ -58,43 +52,44 @@ private:
 template <typename Interface>
 struct Object : Node<Interface> {
     Object(Interface& parent) : Node<Interface>(parent) {
-        this->node.pushObject();
+        this->node.beginObject();
     }
     ~Object() {
-        this->node.popObject();
+        this->node.endObject();
     }
 
     template <typename Key>
     auto object(Key&& key) {
-        this->node.pushKey(std::forward<Key>(key));
+        this->node.writeKey(std::forward<Key>(key));
         return Object(this->node);
     }
 
     template <typename Key>
     auto array(Key&& key) {
-        this->node.pushKey(std::forward<Key>(key));
+        this->node.writeKey(std::forward<Key>(key));
         return Array(this->node);
     }
 
     template <typename Key>
     auto blob(Key&& key) {
-        this->node.pushKey(std::forward<Key>(key));
+        this->node.writeKey(std::forward<Key>(key));
         return Blob(this->node);
     }
 
     template <typename Key, typename ValueType>
     std::enable_if_t<is_primitive_v<ValueType>> value(Key&& key, const ValueType v) {
-        this->node.pushKey(std::forward<Key>(key));
-        this->pushValue(v);
+        this->node.writeKey(std::forward<Key>(key));
+        this->writeValue(v);
     }
     template <typename Key, typename ValueType>
     std::enable_if_t<!is_primitive_v<ValueType>> value(Key&& key, const ValueType& v) {
-        this->node.pushKey(std::forward<Key>(key));
-        this->pushValue(v);
+        this->node.writeKey(std::forward<Key>(key));
+        this->writeValue(v);
     }
+
     template <typename Key, typename ValueType>
     void value(Key&& key, const std::optional<ValueType>& v) {
-        if (!v) return;
+        if (!v.has_value()) return;
         value(std::forward<Key>(key), v.value());
     }
 };
@@ -102,10 +97,10 @@ struct Object : Node<Interface> {
 template <typename Interface>
 struct Array : Node<Interface> {
     Array(Interface& parent) : Node<Interface>(parent) {
-        this->node.pushArray();
+        this->node.beginArray();
     }
     ~Array() {
-        this->node.popArray();
+        this->node.endArray();
     }
 
     auto object() { return Object(this->node); }
@@ -114,17 +109,17 @@ struct Array : Node<Interface> {
 
     template <typename ValueType>
     std::enable_if_t<is_primitive_v<ValueType>> value(const ValueType v) {
-        this->pushValue(v);
+        this->writeValue(v);
     }
 
     template <typename ValueType>
     std::enable_if_t<!is_primitive_v<ValueType>> value(const ValueType& v) {
-        this->pushValue(v);
+        this->writeValue(v);
     }
 
     template <typename ValueType>
     void value(const std::optional<ValueType>& v) {
-        if (!v) return;
+        if (!v.has_value()) return;
         value(v.value());
     }
 };
@@ -132,26 +127,20 @@ struct Array : Node<Interface> {
 template <typename Interface>
 struct Blob : Node<Interface> {
     Blob(Interface& parent) : Node<Interface>(parent) {
-        this->node.pushBlob();
+        this->node.beginBlob();
     }
     ~Blob() {
-        this->node.popBlob();
+        this->node.endBlob();
     }
 
     template <typename ValueType>
     std::enable_if_t<is_primitive_v<ValueType>> value(const ValueType v) {
-        this->pushValue(v);
+        this->writeValue(v);
     }
 
     template <typename ValueType>
     std::enable_if_t<!is_primitive_v<ValueType>> value(const ValueType& v) {
-        this->pushValue(v);
-    }
-
-    template <typename ValueType>
-    void value(const std::optional<ValueType>& v) {
-        if (!v) return;
-        value(v.value());
+        this->writeValue(v);
     }
 };
 }
@@ -167,11 +156,11 @@ struct Serializer : Serialization::Node<Interface> {
 
     template <typename ValueType>
     std::enable_if_t<Clio::is_primitive_v<ValueType>> value(const ValueType v) {
-        this->pushValue(v);
+        this->writeValue(v);
     }
     template <typename ValueType>
     std::enable_if_t<!Clio::is_primitive_v<ValueType>> value(const ValueType& v) {
-        this->pushValue(v);
+        this->writeValue(v);
     }
 };
 }

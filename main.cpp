@@ -3,6 +3,10 @@
 #include <cmath>
 
 #include <vector>
+#include <unordered_map>
+
+#include "helper/vector.h"
+#include "helper/map.h"
 
 
 struct JsonSerializer : Clio::Serializer<JsonSerializer> {
@@ -11,12 +15,12 @@ struct JsonSerializer : Clio::Serializer<JsonSerializer> {
     JsonSerializer(int = 0) {}
 
 protected:
-    void pushObject() {}
-    void popObject() {}
-    void pushArray() {}
-    void popArray() {}
+    void beginObject() {}
+    void endObject() {}
+    void beginArray() {}
+    void endArray() {}
 
-    void pushKey(std::string_view) {}
+    void writeKey(std::string_view) {}
     void write(int) {
         int q = 1;
     }
@@ -37,12 +41,6 @@ struct Bla {
     int x;
     std::vector<int> y = { 0, 1, 0 };
 };
-
-
-template <typename T>
-void serialize(JsonSerializer& s, const std::vector<T>& arg) {
-    auto arr = s.array();
-}
 
 void serialize(JsonSerializer& s, const Bla& arg) {
     s.value(arg.x);
@@ -66,6 +64,11 @@ void serialize(JsonSecondary& s, const Bla& arg) {
 
 int main()
 {
+    using namespace Clio::detail;
+
+    std::vector<int> ab;
+    std::unordered_map<std::string, int> bb;
+
     JsonSecondary s2;
     JsonSerializer s(1);
 
