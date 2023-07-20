@@ -8,6 +8,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(clio
     main.cpp
+    Clio.h
     Serializer.h
     Serializer.cpp
 )
