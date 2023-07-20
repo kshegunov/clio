@@ -3,10 +3,18 @@
 #include <cmath>
 
 #include <vector>
-struct JsonBackend {
-    JsonBackend(int = 0) {}
+
+
+struct JsonSerializer : Clio::Serializer<JsonSerializer> {
+    CLIO_SERIALIZER(JsonSerializer)
+
+    JsonSerializer(int = 0) {}
+
+protected:
     void pushObject() {}
     void popObject() {}
+    void pushArray() {}
+    void popArray() {}
 
     void pushKey(std::string_view) {}
     void write(int) {
@@ -15,47 +23,34 @@ struct JsonBackend {
 
     std::vector<int> x = { 1, 2, 3 };
 };
-struct JsonBackendExt : JsonBackend {
-    void pushArray() {}
-    void popArray() {}
 
-    using JsonBackend::write;
+struct JsonSecondary final : JsonSerializer, Clio::Serializer<JsonSecondary> {
+    CLIO_SERIALIZER(JsonSecondary)
+
+protected:
+    using JsonSerializer::write;
     void write(double) {}
     std::vector<double> y = { 4, 5, 6 };
 };
 
-struct UBackend {
-};
-
-struct JsonSerializer final : Clio::Serializer<JsonSerializer, JsonBackend> {
-    using Base = Clio::Serializer<JsonSerializer, JsonBackend>;
-    using Base::Base;
-};
-
-struct JsonSecondary final : Clio::Serializer<JsonSecondary, JsonBackendExt> {
-//    template <typename Type, typename = std::enable_if_t<Clio::is_serializer_v<Type>>>
-//    operator Type& ()& {
-//        return *this;
-//    }
-};
-
-struct USerialize : Clio::Serializer<USerialize, UBackend> {
-};
-
 struct Bla {
     int x;
+    std::vector<int> y = { 0, 1, 0 };
 };
+
+
+template <typename T>
+void serialize(JsonSerializer& s, const std::vector<T>& arg) {
+    auto arr = s.array();
+}
 
 void serialize(JsonSerializer& s, const Bla& arg) {
     s.value(arg.x);
+    s.value(arg.y);
 }
 
-//void serialize(JsonSecondary& s, const Bla& arg) {
-//    s.value(arg.x);
-//}
-
-void serialize(USerialize& s, const Bla& arg) {
-    int q = 0;
+void serialize(JsonSecondary& s, const Bla& arg) {
+    s.value(arg.x);
 }
 
 //template <typename Serializer>
@@ -73,30 +68,23 @@ int main()
 {
     JsonSecondary s2;
     JsonSerializer s(1);
-    JsonSerializer& x = s2;
-    USerialize a;
 
-//    auto arr = s2.object();
-//    auto z = arr.object("asdsaA");
-//    auto q = z.array("asfkjsaf");
-//    int qrqw;
-//    std::optional<int> mqwe = 1;
-//    q.value(qrqw);
-//    z.value("adasra", qrqw);
-//    z.value("z", mqwe);
-//    s.value(qrqw);
-//    double y;
-
-//    Bla m;
-//    z.value("Asd", m);
-
-//    auto ga = s2.object();
-//    ga.value("asdas", m);
-//    s2.value(y);
+    auto arr = s.object();
+    auto z = arr.object("asdsaA");
+    auto q = z.array("asfkjsaf");
+    int qrqw;
+    std::optional<int> mqwe = 1;
+    q.value(qrqw);
+    z.value("adasra", qrqw);
+    z.value("z", mqwe);
+    s.value(qrqw);
+    double y;
 
     Bla m;
-    x.value(m);
-    s2.value(m);
-    a.value(m);
+    z.value("Asd", m);
+
+    auto ga = s2.object();
+    ga.value("asdas", m);
+    s2.value(y);
     return 0;
 }
