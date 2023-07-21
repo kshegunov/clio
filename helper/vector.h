@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 Konstantin Shegunov <kshegunov@gmail.com>
+// SPDX-License-Identifier: MIT
+
 #include "../Clio.h"
 #include "common.h"
 #include <vector>

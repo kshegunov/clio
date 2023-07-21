@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: © 2023 Konstantin Shegunov <kshegunov@gmail.com>
+// SPDX-License-Identifier: MIT
+
 #pragma once
 
 #include <type_traits>

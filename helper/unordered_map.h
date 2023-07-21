@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: MIT
+
 #include "../Clio.h"
 #include "common.h"
 #include <unordered_map>
