@@ -6,19 +6,10 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_library(clio INTERFACE
-    Clio.h
-    Serializer.h
-    Deserializer.h
-    helper/vector.h
-    helper/map.h
-    helper/unordered_map.h
-    helper/set.h
-    helper/unordered_set.h
-    helper/common.h
-)
+option(CLIO_BUILD_TESTS "Clio: Build tests" OFF)
 
-install(TARGETS clio
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-)
+add_subdirectory(src)
+if(CLIO_BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(test)
+endif()

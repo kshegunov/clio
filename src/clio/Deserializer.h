@@ -16,10 +16,10 @@ protected:
     template <typename ValueType>
     void readValue(ValueType& v) {
         if constexpr (traits::template has_global_read<ValueType>::value) {
-            deserialize(this->node, std::forward<ValueType>(v));
+            deserialize(this->node, v);
         }
         else if constexpr (traits::template has_internal_read<ValueType>::value) {
-            this->node.read(std::forward<ValueType>(v));
+            this->node.read(v);
         }
         else {
             cant_deserialize(v);
@@ -58,8 +58,8 @@ struct Object : Node<Interface> {
         this->node.endObject();
     }
 
-    auto keyAt(std::size_t i) const {
-        return this->node.keyAt(i);
+    auto peekKey() const {
+        return this->node.peekKey();
     }
 
     template <typename Key>
@@ -98,7 +98,7 @@ struct Object : Node<Interface> {
     }
 
     auto empty() const { return !size(); }
-    auto size() const { this->node.size(); }
+    auto size() const { return this->node.size(); }
 };
 
 template <typename Interface>
@@ -120,7 +120,7 @@ struct Array : Node<Interface> {
     }
 
     auto empty() const { return !size(); }
-    auto size() const { this->node.size(); }
+    auto size() const { return this->node.size(); }
 };
 
 template <typename Interface>

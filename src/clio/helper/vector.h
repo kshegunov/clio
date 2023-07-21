@@ -12,7 +12,7 @@ std::enable_if_t<is_serializer_v<Interface>> serialize(Interface& s, const std::
 }
 
 template <typename Interface, typename ... Args>
-std::enable_if_t<is_deserializer_v<Interface>> deserialize(Interface& d, std::vector<Args...>& v) {
+std::enable_if_t<Clio::is_deserializer_v<Interface>> deserialize(Interface& d, std::vector<Args...>& v) {
     detail::deserialize_sequence(d, v);
 }
 }

@@ -28,17 +28,26 @@ protected:
 
 private:
     struct traits {
+        template <typename Type, typename = void>
+        struct has_internal_primitive_write : std::false_type {};
         template <typename Type>
-        using write_argument_t = std::conditional_t<is_primitive_v<Type>, remove_cvref_t<Type>, std::add_lvalue_reference_t<std::add_const_t<Type>>>;
-
+        struct has_internal_primitive_write<Type,
+            std::void_t<
+                std::enable_if_t<is_primitive_v<Type>>,
+                decltype(static_cast<void(remove_cvref_t<Interface>::*)(remove_cvref_t<Type>)>(&remove_cvref_t<Interface>::write))
+            >
+        > : std::true_type {};
+        template <typename Type, typename = void>
+        struct has_internal_class_write : std::false_type {};
         template <typename Type>
-        using internal_write_trait = std::void_t<
-            decltype(static_cast<void(remove_cvref_t<Interface>::*)(write_argument_t<Type>)>(&remove_cvref_t<Interface>::write))
-        >;
-        template <typename, typename = void>
-        struct has_internal_write : std::false_type {};
+        struct has_internal_class_write<Type,
+            std::void_t<
+                std::enable_if_t<!is_primitive_v<Type>>,
+                decltype(std::declval<Interface&>().write(std::declval<Type>()))
+            >
+        > : std::true_type {};
         template <typename Type>
-        struct has_internal_write<Type, internal_write_trait<Type>> : std::true_type {};
+        using has_internal_write = std::bool_constant<has_internal_primitive_write<Type>::value || has_internal_class_write<Type>::value>;
 
         template <typename Type>
         using global_write_trait = std::void_t<
@@ -152,6 +161,8 @@ namespace Clio {
 template <typename Interface>
 struct Serializer : Serialization::Node<Interface> {
     Serializer() : Serialization::Node<Interface>(static_cast<Interface&>(*this)) {}
+    Serializer(const Serializer&) = delete;
+    Serializer& operator = (const Serializer&) = delete;
 
     auto object() { return Serialization::Object(this->node); }
     auto array() { return Serialization::Array(this->node); }

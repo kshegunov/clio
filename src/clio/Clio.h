@@ -10,6 +10,7 @@
     friend Clio::Serialization::Object<Name>; \
     friend Clio::Serialization::Array<Name>; \
     friend Clio::Serialization::Blob<Name>; \
+public:\
     using Clio::Serializer<Name>::value; \
     using Clio::Serializer<Name>::object; \
     using Clio::Serializer<Name>::array; \
@@ -20,10 +21,11 @@
     friend Clio::Deserialization::Object<Name>; \
     friend Clio::Deserialization::Array<Name>; \
     friend Clio::Deserialization::Blob<Name>; \
-    using Clio::Deserialization<Name>::value; \
-    using Clio::Deserialization<Name>::object; \
-    using Clio::Deserialization<Name>::array; \
-    using Clio::Deserialization<Name>::blob;
+public:\
+    using Clio::Deserializer<Name>::value; \
+    using Clio::Deserializer<Name>::object; \
+    using Clio::Deserializer<Name>::array; \
+    using Clio::Deserializer<Name>::blob;
 
 namespace Clio {
 template <typename>
