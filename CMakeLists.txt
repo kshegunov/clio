@@ -6,8 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
-add_executable(clio
-    main.cpp
+add_library(clio INTERFACE
     Clio.h
     Serializer.h
     Deserializer.h
