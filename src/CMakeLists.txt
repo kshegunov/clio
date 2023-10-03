@@ -3,6 +3,7 @@ add_library(clio INTERFACE
     clio/Serializer.h
     clio/Deserializer.h
     clio/helper/vector.h
+    clio/helper/array.h
     clio/helper/map.h
     clio/helper/unordered_map.h
     clio/helper/set.h

@@ -14,11 +14,11 @@ struct Node : Clio::Node<Interface> {
 
 protected:
     template <typename ValueType>
-    void readValue(ValueType& v) {
-        if constexpr (traits::template has_global_read<ValueType>::value) {
+    void value(ValueType& v) {
+        if constexpr (has_global_read<ValueType>()) {
             deserialize(this->node, v);
         }
-        else if constexpr (traits::template has_internal_read<ValueType>::value) {
+        else if constexpr (has_internal_read<ValueType>()) {
             this->node.read(v);
         }
         else {
@@ -26,34 +26,58 @@ protected:
         }
     }
 
+    template <typename ValueType, typename Head, typename ... Tail>
+    void value(ValueType& v, Head&& head, Tail&& ... tail) {
+        if constexpr (std::is_invocable_v<Head, Interface&, ValueType&, Tail...>) {
+            std::forward<Head>(head)(this->node, v, std::forward<Tail>(tail)...);
+        }
+        else if constexpr (has_global_read<ValueType, Head, Tail...>()) {
+            deserialize(this->node, v, std::forward<Head>(head), std::forward<Tail>(tail)...);
+        }
+        else if constexpr (has_internal_read<ValueType, Head, Tail...>()) {
+            this->node.read(v, std::forward<Head>(head), std::forward<Tail>(tail)...);
+        }
+        else {
+            cant_deserialize(v);
+        }
+    }
+
 private:
+    template <typename Type, typename ... Arguments>
+    static constexpr bool has_internal_read() { return traits::template has_internal_read<pack<Type, Arguments...>>::value; }
+    template <typename Type, typename ... Arguments>
+    static constexpr bool has_global_read() { return traits::template has_global_read<pack<Type, Arguments...>>::value; }
+
     struct traits {
-        template <typename Type>
+        template <typename Type, typename ... Arguments>
         using internal_read_trait = std::void_t<
-            decltype(static_cast<void(remove_cvref_t<Interface>::*)(Type&)>(&remove_cvref_t<Interface>::read))
+            decltype(std::declval<Interface&>().read(std::declval<Type&>(), std::declval<remove_cvref_t<Arguments>>()...))
         >;
         template <typename, typename = void>
         struct has_internal_read : std::false_type {};
-        template <typename Type>
-        struct has_internal_read<Type, internal_read_trait<Type>> : std::true_type {};
+        template <typename Type, typename ... Arguments>
+        struct has_internal_read<pack<Type, Arguments...>, internal_read_trait<Type, Arguments...>> : std::true_type {};
 
-        template <typename Type>
+        template <typename Type, typename ... Arguments>
         using global_read_trait = std::void_t<
-            decltype(deserialize(std::declval<Interface&>(), std::declval<Type&>())),
-            std::enable_if_t<!is_primitive_v<Type>>
+            std::enable_if_t<(!is_primitive_v<Type> || sizeof...(Arguments) > 0)>,
+            decltype(deserialize(std::declval<Interface&>(), std::declval<Type&>(), std::declval<Arguments>()...))
         >;
         template <typename, typename = void>
         struct has_global_read : std::false_type {};
-        template <typename Type>
-        struct has_global_read<Type, global_read_trait<Type>> : std::true_type {};
+        template <typename Type, typename ... Arguments>
+        struct has_global_read<pack<Type, Arguments...>, global_read_trait<remove_cvref_t<Type>, Arguments...>> : std::true_type {};
     };
 };
 
 template <typename Interface>
 struct Object : Node<Interface> {
-    Object(Interface& parent) : Node<Interface>(parent) {
+    using Base = Node<Interface>;
+
+    Object(Interface& parent) : Base(parent) {
         this->node.beginObject();
     }
+
     ~Object() {
         this->node.endObject();
     }
@@ -67,34 +91,42 @@ struct Object : Node<Interface> {
         return this->node.hasKey(key);
     }
 
-    template <typename Key>
+    template <typename Key, typename Type = Object<Interface>>
     auto object(Key&& key) {
         this->node.readKey(std::forward<Key>(key));
-        return Object(this->node);
+        return Type(this->node);
     }
 
-    template <typename Key>
+    template <typename Key, typename Type = Array<Interface>>
     auto array(Key&& key) {
         this->node.readKey(std::forward<Key>(key));
-        return Array(this->node);
+        return Type(this->node);
     }
 
-    template <typename Key>
+    template <typename Key, typename Type = Blob<Interface>>
     auto blob(Key&& key) {
         this->node.readKey(std::forward<Key>(key));
-        return Blob(this->node);
+        return Type(this->node);
     }
 
-    template <typename Key, typename ValueType>
-    void value(Key&& key, ValueType& v) {
+    template <typename Key, typename ValueType, typename ... Arguments>
+    std::enable_if_t<(!is_instantiation_of_v<std::optional, ValueType>)> value(Key&& key, ValueType& v, Arguments&& ... args) {
         this->node.readKey(std::forward<Key>(key));
-        this->readValue(v);
+        Base::value(v, std::forward<Arguments>(args)...);
     }
 
-    template <typename Key, typename ValueType>
-    void value(Key&& key, const std::optional<ValueType>& v) {
+    template <typename Key, typename ValueType, typename ... Arguments>
+    std::enable_if_t<is_instantiation_of_v<std::optional, ValueType>> value(Key&& key, ValueType& v, Arguments&& ... args) {
         if (!hasKey(key)) return;
-        value(std::forward<Key>(key), v.value());
+        typename ValueType::value_type result;
+        value(std::forward<Key>(key), result, std::forward<Arguments>(args)...);
+        v = std::move(result);
+    }
+
+    template <typename Key, typename ValueType, typename ... Arguments>
+    void optional(Key&& key, ValueType& v, Arguments&& ... args) {
+        if (!hasKey(key)) return;
+        value(std::forward<Key>(key), v, std::forward<Arguments>(args)...);
     }
 
     auto empty() const { return !size(); }
@@ -103,21 +135,23 @@ struct Object : Node<Interface> {
 
 template <typename Interface>
 struct Array : Node<Interface> {
-    Array(Interface& parent) : Node<Interface>(parent) {
+    using Base = Node<Interface>;
+    using Base::value;
+
+    Array(Interface& parent) : Base(parent) {
         this->node.beginArray();
     }
+
     ~Array() {
         this->node.endArray();
     }
 
-    auto object() { return Object(this->node); }
-    auto array() { return Array(this->node); }
-    auto blob() { return Blob(this->node); }
-
-    template <typename ValueType>
-    void value(ValueType& v) {
-        this->readValue(v);
-    }
+    template <typename Type = Object<Interface>>
+    auto object() { return Type(this->node); }
+    template <typename Type = Array<Interface>>
+    auto array() { return Type(this->node); }
+    template <typename Type = Blob<Interface>>
+    auto blob() { return Type(this->node); }
 
     auto empty() const { return !size(); }
     auto size() const { return this->node.size(); }
@@ -125,16 +159,15 @@ struct Array : Node<Interface> {
 
 template <typename Interface>
 struct Blob : Node<Interface> {
-    Blob(Interface& parent) : Node<Interface>(parent) {
+    using Base = Node<Interface>;
+    using Base::value;
+
+    Blob(Interface& parent) : Base(parent) {
         this->node.beginBlob();
     }
+
     ~Blob() {
         this->node.endBlob();
-    }
-
-    template <typename ValueType>
-    void value(ValueType& v) {
-        this->readValue(v);
     }
 };
 }
@@ -142,15 +175,23 @@ struct Blob : Node<Interface> {
 namespace Clio {
 template <typename Interface>
 struct Deserializer : Deserialization::Node<Interface> {
-    Deserializer() : Deserialization::Node<Interface>(static_cast<Interface&>(*this)) {}
+    using Base = Deserialization::Node<Interface>;
+    using Base::value;
 
-    auto object() { return Deserialization::Object(this->node); }
-    auto array() { return Deserialization::Array(this->node); }
-    auto blob() { return Deserialization::Blob(this->node); }
+    Deserializer() : Base(static_cast<Interface&>(*this)) {}
 
-    template <typename ValueType>
-    void value(ValueType& v) {
-        this->readValue(v);
+    template <typename Type = Deserialization::Object<Interface>>
+    auto object() { return Type(this->node); }
+    template <typename Type = Deserialization::Array<Interface>>
+    auto array() { return Type(this->node); }
+    template <typename Type = Deserialization::Blob<Interface>>
+    auto blob() { return Type(this->node); }
+
+    template <typename ValueType, typename ... Arguments>
+    ValueType root(Arguments&& ... args) {
+        ValueType v;
+        value(v, std::forward<Arguments>(args)...);
+        return v;
     }
 };
 }

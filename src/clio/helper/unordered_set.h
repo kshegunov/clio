@@ -6,13 +6,13 @@
 #include <unordered_set>
 
 namespace Clio {
-template <typename Interface, typename ... Args>
-std::enable_if_t<is_serializer_v<Interface>> serialize(Interface& s, const std::unordered_set<Args...>& v) {
-    detail::serialize_sequence(s, v);
+template <typename Interface, typename ... Parameters, typename ... Arguments>
+std::enable_if_t<is_serializer_v<Interface>> serialize(Interface& s, const std::unordered_set<Parameters...>& v, Arguments&& ... args) {
+    detail::serialize_sequence(s, v, std::forward<Arguments>(args)...);
 }
 
-template <typename Interface, typename ... Args>
-std::enable_if_t<is_deserializer_v<Interface>> deserialize(Interface& d, std::unordered_set<Args...>& v) {
-    detail::deserialize_sequence(d, v);
+template <typename Interface, typename ... Parameters, typename ... Arguments>
+std::enable_if_t<is_deserializer_v<Interface>> deserialize(Interface& d, std::unordered_set<Parameters...>& v, Arguments&& ... args) {
+    detail::deserialize_sequence(d, v, std::forward<Arguments>(args)...);
 }
 }
